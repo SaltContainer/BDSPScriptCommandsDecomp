@@ -578,17 +578,128 @@ namespace BDSP.Dpr.EvScript
         private void EnvironmentControllerCallBack(EnvironmentController controller, float deltaTime) { }
 
         // RVA: 0x173EE40 Offset: 0x173EF41 VA: 0x173EE40
-        public bool JumpLabel(string label, EvDataManager.EventEndDelegate callback)
+        public bool JumpLabel(string label, EventEndDelegate callback)
         {
-            //Stub
-            return true;
+            // TODO: Is this just allocating memory for something?
+            if ((DAT_7104c73abf & 1) == 0)
+            {
+                thunk_FUN_710026bc70(0x4580);
+                DAT_7104c73abf = 1;
+            }
+
+            if (!string.IsNullOrEmpty(label) && _findAllLabel.ContainsKey(label))
+            {
+                int[] foundLabel = _findAllLabel[label]; //Probably some struct
+                if (foundLabel[6] != 0)
+                {
+                    int uVar1 = foundLabel[8];
+                    if ((uint)uVar1 == 0xffffffff)
+                    {
+                        SetCloudScaleEnd();
+                    }
+                    else
+                    {
+                        if (_eventListIndex == -1)
+                        {
+                            SetCloudScaleStart();
+                        }
+                    }
+
+                    _eventListIndex = uVar1;
+                    if (_eventListIndex < _eventList.Length)
+                    {
+                        if ((uint)foundLabel[6] > 1)
+                        {
+                            _eventList[_eventListIndex].LabelIndex = foundLabel[9];
+                            if (_eventListIndex < _eventList.Length)
+                            {
+                                _eventList[_eventListIndex].CommandIndex = 0;
+                                if (callback != null)
+                                {
+                                    Delegate combinedDelegate = Delegate.Combine(_eventEndDelegate, callback);
+                                    if (combinedDelegate != null && !(combinedDelegate is EventEndDelegate))
+                                    {
+                                        FUNC_ThrowInvalidCast(combinedDelegate);
+                                        return true;
+                                    }
+                                    _eventEndDelegate = (EventEndDelegate)combinedDelegate;
+
+                                    // TODO: What is this?
+                                    thunk_FUN_710029a080(_eventEndDelegate, combinedDelegate);
+                                }
+                                return true;
+                            }
+                        }
+                    }
+                }
+
+                FUNC_ThrowIndexOutOfRange();
+                return true;
+            }
+            return false;
         }
 
         // RVA: 0x1744CA0 Offset: 0x1744DA1 VA: 0x1744CA0
         public bool CallLabel(string label)
         {
-            //Stub
-            return true;
+            // TODO: Is this just allocating memory for something?
+            if ((DAT_7104c73ac0 & 1) == 0)
+            {
+                thunk_FUN_710026bc70(0x430a);
+                DAT_7104c73ac0 = 1;
+            }
+
+            if (!string.IsNullOrEmpty(label) && _findAllLabel.ContainsKey(label))
+            {
+                if (_eventListIndex < _eventList.Length)
+                {
+                    //A lot of this is presumed, the ghidra decomp is hard to understand here
+                    EvCallData call;
+                    call.EventListIndex = _eventListIndex;
+                    call.LabelIndex = _eventList[_eventListIndex].LabelIndex;
+                    call.CommandIndex = 0; //Required for defining struct, undefined normally (likely 0)
+                    _callQueue.Push(call);
+
+                    int[] foundLabel = _findAllLabel[label]; //Probably some struct
+                    if (foundLabel[6] != 0)
+                    {
+                        int uVar1 = foundLabel[8];
+                        if ((uint)uVar1 == 0xffffffff)
+                        {
+                            SetCloudScaleEnd();
+                        }
+                        else
+                        {
+                            if (_eventListIndex == -1)
+                            {
+                                SetCloudScaleStart();
+                            }
+                        }
+
+                        _eventListIndex = uVar1;
+                        if (_eventListIndex < _eventList.Length)
+                        {
+                            EvScriptData script = _eventList[_eventListIndex];
+                            foundLabel = _findAllLabel[label];
+
+                            if ((uint)foundLabel[6] > 1)
+                            {
+                                script.LabelIndex = foundLabel[9];
+                                if (_eventListIndex < _eventList.Length)
+                                {
+                                    _eventList[_eventListIndex].CommandIndex = 0;
+                                    return true;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                FUNC_ThrowIndexOutOfRange();
+                return true;
+            }
+
+            return false;
         }
 
         // RVA: 0x1744E30 Offset: 0x1744F31 VA: 0x1744E30
@@ -1206,15 +1317,98 @@ namespace BDSP.Dpr.EvScript
         // RVA: 0x17525E0 Offset: 0x17526E1 VA: 0x17525E0
         private bool IfJump_Call(bool jump, string eq, string label)
         {
-            //Stub
-            return true;
+            // TODO: Is this just allocating memory for something?
+            if ((DAT_7104c73b03 & 1) == 0)
+            {
+                thunk_FUN_710026bc70(0x456d);
+                DAT_7104c73b03 = 1;
+            }
+
+            string comparison = ReEQType(eq);
+            switch (comparison)
+            {
+                case "EQ":
+                    //Exclude Less and Greater
+                    if (_cmp_flag != CmpResult.EQUAL)
+                    {
+                        return false;
+                    }
+                    break;
+                case "NE":
+                    //Exclude Equal
+                    if (_cmp_flag == CmpResult.EQUAL)
+                    {
+                        return false;
+                    }
+                    break;
+                case "GT":
+                    //Exclude Less and Equal
+                    if (_cmp_flag != CmpResult.PLUS)
+                    {
+                        return false;
+                    }
+                    break;
+                case "GE":
+                    //Exclude Less
+                    if (_cmp_flag == CmpResult.MINUS)
+                    {
+                        return false;
+                    }
+                    break;
+                case "LT":
+                    //Exclude Greater and Equal
+                    if (_cmp_flag != CmpResult.MINUS)
+                    {
+                        return false;
+                    }
+                    break;
+                case "LE":
+                    //Exclude Greater
+                    if (_cmp_flag == CmpResult.PLUS)
+                    {
+                        return false;
+                    }
+                    break;
+                default:
+                    return false;
+            }
+
+            if (jump)
+            {
+                return JumpLabel(label, null);
+            }
+            return CallLabel(label);
         }
 
         // RVA: 0x1752460 Offset: 0x1752561 VA: 0x1752460
         private string ReEQType(string eq)
         {
-            //Stub
-            return "";
+            // TODO: Is this just allocating memory for something?
+            if ((DAT_7104c73b04 & 1) == 0)
+            {
+                thunk_FUN_710026bc70(0x45a0);
+                DAT_7104c73b04 = 1;
+            }
+
+            switch (eq)
+            {
+                case "EQUAL":
+                    return "EQ";
+                case "LITTLER":
+                    return "LT";
+                case "GREATER":
+                    return "GT";
+                case "LT_EQ":
+                    return "LE";
+                case "GT_EQ":
+                    return "GE";
+                case "FLGON":
+                    return "EQ";
+                case "FLGOFF":
+                    return "LT";
+                default:
+                    return eq;
+            }
         }
 
         // RVA: 0x1752780 Offset: 0x1752881 VA: 0x1752780
@@ -1843,28 +2037,280 @@ namespace BDSP.Dpr.EvScript
         // RVA: 0x175D6F0 Offset: 0x175D7F1 VA: 0x175D6F0
         private bool EvMacro_IF_FLAGON_JUMP()
         {
-            //Stub
+            // TODO: Is this just allocating memory for something?
+            if ((DAT_7104c73d2e & 1) == 0)
+            {
+                thunk_FUN_710026bc70(0x4540);
+                DAT_7104c73d2e = 1;
+            }
+
+            if (_evArg.Length < 3)
+            {
+                FUNC_ThrowIndexOutOfRange();
+                return true;
+            }
+
+            // TODO: Is this just allocating memory for something?
+            if ((DAT_7104c73d10 & 1) == 0)
+            {
+                thunk_FUN_710026bc70(0x4556);
+                DAT_7104c73d10 = 1;
+            }
+
+            string label;
+            if (_evArg[2].argType == EvData.ArgType.String)
+            {
+                label = _evData.EvData.GetString(_evArg[2].data);
+            }
+            else
+            {
+                label = "";
+            }
+
+            if (_evArg.Length < 2)
+            {
+                FUNC_ThrowIndexOutOfRange();
+                return true;
+            }
+
+            bool flagState;
+            int flagNo = _evArg[1].data;
+            if (_evArg[1].argType == EvData.ArgType.SysFlag)
+            {
+                flagState = FlagWork.GetSysFlag((EvWork.SYSFLAG_INDEX)flagNo);
+            }
+            else
+            {
+                if (_evArg[1].argType != EvData.ArgType.Flag)
+                {
+                    return true;
+                }
+                if (flagNo < 0)
+                {
+                    return true;
+                }
+                if (flagNo == (int)EvWork.FLAG_INDEX.FLAG_END_SAVE_SIZE)
+                {
+                    return true;
+                }
+                flagState = FlagWork.GetSysFlag((EvWork.SYSFLAG_INDEX)flagNo);
+            }
+
+            if (flagState)
+            {
+                _cmp_flag = CmpResult.EQUAL;
+                IfJump_Call(true, "FLGON", label);
+            }
+
             return true;
         }
 
         // RVA: 0x175D890 Offset: 0x175D991 VA: 0x175D890
         private bool EvMacro_IF_FLAGOFF_JUMP()
         {
-            //Stub
+            // TODO: Is this just allocating memory for something?
+            if ((DAT_7104c73d2f & 1) == 0)
+            {
+                thunk_FUN_710026bc70(0x453e);
+                DAT_7104c73d2f = 1;
+            }
+
+            if (_evArg.Length < 3)
+            {
+                FUNC_ThrowIndexOutOfRange();
+                return true;
+            }
+
+            // TODO: Is this just allocating memory for something?
+            if ((DAT_7104c73d10 & 1) == 0)
+            {
+                thunk_FUN_710026bc70(0x4556);
+                DAT_7104c73d10 = 1;
+            }
+
+            string label;
+            if (_evArg[2].argType == EvData.ArgType.String)
+            {
+                label = _evData.EvData.GetString(_evArg[2].data);
+            }
+            else
+            {
+                label = "";
+            }
+
+            if (_evArg.Length < 2)
+            {
+                FUNC_ThrowIndexOutOfRange();
+                return true;
+            }
+
+            bool flagState;
+            int flagNo = _evArg[1].data;
+            if (_evArg[1].argType == EvData.ArgType.SysFlag)
+            {
+                flagState = FlagWork.GetSysFlag((EvWork.SYSFLAG_INDEX)flagNo);
+            }
+            else
+            {
+                if (_evArg[1].argType != EvData.ArgType.Flag)
+                {
+                    return true;
+                }
+                if (flagNo < 0 || flagNo == (int)EvWork.FLAG_INDEX.FLAG_END_SAVE_SIZE)
+                {
+                    _cmp_flag = 0;
+                    IfJump_Call(true, "FLGOFF", label);
+                    return true;
+                }
+                flagState = FlagWork.GetFlag(flagNo);
+            }
+
+            if (flagState)
+            {
+                _cmp_flag = CmpResult.MINUS;
+                IfJump_Call(true, "FLGOFF", label);
+            }
+            
             return true;
         }
 
         // RVA: 0x175D9D0 Offset: 0x175DAD1 VA: 0x175D9D0
         private bool EvMacro_IF_FLAGON_CALL()
         {
-            //Stub
+            // TODO: Is this just allocating memory for something?
+            if ((DAT_7104c73d30 & 1) == 0)
+            {
+                thunk_FUN_710026bc70(0x453f);
+                DAT_7104c73d30 = 1;
+            }
+
+            if (_evArg.Length < 3)
+            {
+                FUNC_ThrowIndexOutOfRange();
+                return true;
+            }
+
+            // TODO: Is this just allocating memory for something?
+            if ((DAT_7104c73d10 & 1) == 0)
+            {
+                thunk_FUN_710026bc70(0x4556);
+                DAT_7104c73d10 = 1;
+            }
+
+            string label;
+            if (_evArg[2].argType == EvData.ArgType.String)
+            {
+                label = _evData.EvData.GetString(_evArg[2].data);
+            }
+            else
+            {
+                label = "";
+            }
+
+            if (_evArg.Length < 2)
+            {
+                FUNC_ThrowIndexOutOfRange();
+                return true;
+            }
+
+            bool flagState;
+            int flagNo = _evArg[1].data;
+            if (_evArg[1].argType == EvData.ArgType.SysFlag)
+            {
+                flagState = FlagWork.GetSysFlag((EvWork.SYSFLAG_INDEX)flagNo);
+            }
+            else
+            {
+                if (_evArg[1].argType != EvData.ArgType.Flag)
+                {
+                    return true;
+                }
+                if (flagNo < 0)
+                {
+                    return true;
+                }
+                if (flagNo == (int)EvWork.FLAG_INDEX.FLAG_END_SAVE_SIZE)
+                {
+                    return true;
+                }
+                flagState = FlagWork.GetFlag(flagNo);
+            }
+
+            if (flagState)
+            {
+                _cmp_flag = CmpResult.EQUAL;
+                IfJump_Call(false, "FLGON", label);
+            }
+
             return true;
         }
 
         // RVA: 0x175DB10 Offset: 0x175DC11 VA: 0x175DB10
         private bool EvMacro_IF_FLAGOFF_CALL()
         {
-            //Stub
+            // TODO: Is this just allocating memory for something?
+            if ((DAT_7104c73d31 & 1) == 0)
+            {
+                thunk_FUN_710026bc70(0x453d);
+                DAT_7104c73d31 = 1;
+            }
+
+            if (_evArg.Length < 3)
+            {
+                FUNC_ThrowIndexOutOfRange();
+                return true;
+            }
+
+            // TODO: Is this just allocating memory for something?
+            if ((DAT_7104c73d10 & 1) == 0)
+            {
+                thunk_FUN_710026bc70(0x4556);
+                DAT_7104c73d10 = 1;
+            }
+
+            string label;
+            if (_evArg[2].argType == EvData.ArgType.String)
+            {
+                label = _evData.EvData.GetString(_evArg[2].data);
+            }
+            else
+            {
+                label = "";
+            }
+
+            if (_evArg.Length < 2)
+            {
+                FUNC_ThrowIndexOutOfRange();
+                return true;
+            }
+
+            bool flagState;
+            int flagNo = _evArg[1].data;
+            if (_evArg[1].argType == EvData.ArgType.SysFlag)
+            {
+                flagState = FlagWork.GetSysFlag((EvWork.SYSFLAG_INDEX)flagNo);
+            }
+            else
+            {
+                if (_evArg[1].argType != EvData.ArgType.Flag)
+                {
+                    return true;
+                }
+                if (flagNo < 0 || flagNo == (int)EvWork.FLAG_INDEX.FLAG_END_SAVE_SIZE)
+                {
+                    _cmp_flag = 0;
+                    IfJump_Call(false, "FLGOFF", label);
+                    return true;
+                }
+                flagState = FlagWork.GetFlag(flagNo);
+            }
+
+            if (!flagState)
+            {
+                _cmp_flag = CmpResult.MINUS;
+                IfJump_Call(false, "FLGOFF", label);
+            }
+
             return true;
         }
 
@@ -1878,7 +2324,39 @@ namespace BDSP.Dpr.EvScript
         // RVA: 0x175DC50 Offset: 0x175DD51 VA: 0x175DC50
         private bool EvCmdFlagCheckWk()
         {
-            //Stub
+            if (_evArg.Length < 2)
+            {
+                FUNC_ThrowIndexOutOfRange();
+                return true;
+            }
+
+            int workNo = _evArg[1].data;
+            CmpResult result;
+            switch (_evArg[1].argType)
+            {
+                case EvData.ArgType.Work:
+                    int workValue = FlagWork.GetWork(workNo);
+                    if (workValue < 0 || workValue == (int)EvWork.FLAG_INDEX.FLAG_END_SAVE_SIZE) result = CmpResult.EQUAL;
+                    else result = FlagWork.GetFlag(workValue) ? CmpResult.MINUS : CmpResult.EQUAL;
+                    break;
+
+                case EvData.ArgType.Float:
+                    if (workNo < 0 || workNo == (int)EvWork.FLAG_INDEX.FLAG_END_SAVE_SIZE) result = CmpResult.EQUAL;
+                    else result = FlagWork.GetFlag(workNo) ? CmpResult.MINUS : CmpResult.EQUAL;
+                    break;
+
+                default:
+                    result = FlagWork.GetFlag(0) ? CmpResult.MINUS : CmpResult.EQUAL;
+                    break;
+            }
+
+            if (_evArg.Length < 3)
+            {
+                FUNC_ThrowIndexOutOfRange();
+                return true;
+            }
+
+            FlagWork.SetWork(_evArg[2].data, (int)result);
             return true;
         }
 
@@ -10007,8 +10485,8 @@ namespace BDSP.Dpr.EvScript
                         {
                             if (_evArg.Length < 2)
                             {
-                                FUNC_ThrowOutOfRange();
-                                return false;
+                                FUNC_ThrowIndexOutOfRange();
+                                return true;
                             }
                             string label = "";
                             if (_evArg[1].argType == EvData.ArgType.String)
@@ -10034,8 +10512,8 @@ namespace BDSP.Dpr.EvScript
                         {
                             if (_evArg.Length < 2)
                             {
-                                FUNC_ThrowOutOfRange();
-                                return false;
+                                FUNC_ThrowIndexOutOfRange();
+                                return true;
                             }
                             string label = "";
                             if (_evArg[1].argType == EvData.ArgType.String)
@@ -10077,8 +10555,8 @@ namespace BDSP.Dpr.EvScript
                             // This is presumed. The ghidra decomp is so hard to understand here
                             if (_evArg.Length < 2)
                             {
-                                FUNC_ThrowOutOfRange();
-                                return false;
+                                FUNC_ThrowIndexOutOfRange();
+                                return true;
                             }
                             _switch_work_index = _evArg[1].data;
                             return true;
@@ -10106,8 +10584,8 @@ namespace BDSP.Dpr.EvScript
                         {
                             if (_evArg.Length < 2)
                             {
-                                FUNC_ThrowOutOfRange();
-                                return false;
+                                FUNC_ThrowIndexOutOfRange();
+                                return true;
                             }
                             SetSysFlag(_evArg[1].data, true);
                             return true;
@@ -10117,8 +10595,8 @@ namespace BDSP.Dpr.EvScript
                         {
                             if (_evArg.Length < 2)
                             {
-                                FUNC_ThrowOutOfRange();
-                                return false;
+                                FUNC_ThrowIndexOutOfRange();
+                                return true;
                             }
                             int flagNo = _evArg[1].data;
                             if (flagNo > -1)
@@ -10132,8 +10610,8 @@ namespace BDSP.Dpr.EvScript
                         {
                             if (_evArg.Length < 2)
                             {
-                                FUNC_ThrowOutOfRange();
-                                return false;
+                                FUNC_ThrowIndexOutOfRange();
+                                return true;
                             }
                             int flagNo = _evArg[1].data;
                             if ((flagNo < 0) || (flagNo == (int)EvWork.FLAG_INDEX.FLAG_END_SAVE_SIZE) || !FlagWork.GetFlag(flagNo))
@@ -10147,6 +10625,36 @@ namespace BDSP.Dpr.EvScript
                             return true;
                         }
 
+                    case EvCmdID.NAME._IF_FLAGON_JUMP:
+                        {
+                            EvMacro_IF_FLAGON_JUMP();
+                            return true;
+                        }
+
+                    case EvCmdID.NAME._IF_FLAGOFF_JUMP:
+                        {
+                            EvMacro_IF_FLAGOFF_JUMP();
+                            return true;
+                        }
+
+                    case EvCmdID.NAME._IF_FLAGON_CALL:
+                        {
+                            EvMacro_IF_FLAGON_CALL();
+                            return true;
+                        }
+
+                    case EvCmdID.NAME._IF_FLAGOFF_CALL:
+                        {
+                            EvMacro_IF_FLAGOFF_CALL();
+                            return true;
+                        }
+
+                    case EvCmdID.NAME._FLAG_CHECK_WK:
+                        {
+                            EvCmdFlagCheckWk();
+                            return true;
+                        }
+
                     default:
                         {
                             return true;
@@ -10156,9 +10664,14 @@ namespace BDSP.Dpr.EvScript
             return true;
         }
 
-        private void FUNC_ThrowOutOfRange()
+        private void FUNC_ThrowIndexOutOfRange()
         {
             throw new IndexOutOfRangeException("System");
+        }
+
+        private void FUNC_ThrowInvalidCast(object obj)
+        {
+            throw new InvalidCastException("System");
         }
 
         private void FUNC_EndScript()
@@ -10369,5 +10882,7 @@ namespace BDSP.Dpr.EvScript
             public int LabelIndex; // 0x4
             public int CommandIndex; // 0x8
         }
+
+        public delegate void EventEndDelegate();
     }
 }
