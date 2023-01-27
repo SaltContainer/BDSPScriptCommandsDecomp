@@ -9196,7 +9196,29 @@ namespace BDSP.Dpr.EvScript
         // RVA: 0x1787AA0 Offset: 0x1787BA1 VA: 0x1787AA0
         private bool EvCmdEventCameraIndex()
         {
-            //Stub
+            if (_evArg.Length < 2)
+            {
+                FUNC_ThrowIndexOutOfRange();
+            }
+
+            int workNo = _evArg[1].data;
+            int index;
+
+            if (_evArg[1].argType == EvData.ArgType.Work)
+            {
+                index = FlagWork.GetWork(workNo);
+            }
+            else
+            {
+                index = 0;
+                if (_evArg[1].argType == EvData.ArgType.Float)
+                {
+                    index = workNo;
+                }
+            }
+
+            GameManager.fieldCamera.EventCamera.SetCameraData(_evCameraTable, index);
+
             return true;
         }
 
@@ -9930,7 +9952,19 @@ namespace BDSP.Dpr.EvScript
         // RVA: 0x1790430 Offset: 0x1790531 VA: 0x1790430
         private bool EvCmd_CAMERA_CONTROLLER_PLAY()
         {
-            //Stub
+            if (_evArg.Length < 2)
+            {
+                FUNC_ThrowIndexOutOfRange();
+                return true;
+            }
+
+            string statename = "";
+            if (_evArg[1].argType == EvData.ArgType.String)
+            {
+                statename = _evData.EvData.GetString(_evArg[1].data);
+            }
+
+            FieldAnimeCamera.instance.Play(statename);
             return true;
         }
 
@@ -11076,6 +11110,18 @@ namespace BDSP.Dpr.EvScript
                     case EvCmdID.NAME._FLAG_CHECK_WK:
                         {
                             EvCmdFlagCheckWk();
+                            return true;
+                        }
+
+                    case EvCmdID.NAME._EVENT_CAMERA_INDEX:
+                        {
+                            EvCmdEventCameraIndex();
+                            return true;
+                        }
+
+                    case EvCmdID.NAME._CAMERA_CONTROLLER_PLAY:
+                        {
+                            EvCmd_CAMERA_CONTROLLER_PLAY();
                             return true;
                         }
 
